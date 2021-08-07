@@ -1,0 +1,75 @@
+---
+
+- name: create wireguard config dir
+  file:
+    path: "{{ wg_conf_dir }}"
+    state: directory
+
+- name: generate wireguard server keypair
+  shell: |
+    umask 077 && wg genkey | tee {{ wg_conf_dir }}/privkey | wg pubkey > {{ wg_conf_dir }}/pubkey
+
+- name: get wireguard private key
+  slurp:
+    src: "{{ wg_conf_dir }}/privkey"
+  register: wg_privatekey_base64
+  no_log: true
+
+- name: get wireguard public key
+  slurp:
+    src: "{{ wg_conf_dir }}/pubkey"
+  register: wg_pubkey_base64
+
+- name: set peer data from other servers as fact wg_server_endpoints
+  set_fact:
+    wg_server_endpoints: "{{ wg_server_endpoints | default([])  + [{'EndPoint': item, 'PublicKey': hostvars[item].wg_pubkey_base64, 'WgTunIfaceIp': hostvars[item].wireguard_tunnel_interface_ip , 'LocalNetwork': hostvars[item].local_network , 'AllowedIps': [ hostvars[item].wireguard_tunnel_interface_ip, hostvars[item].local_network], 'Route': { hostvars[item].local_network: { 'next_hop': { hostvars[item].wireguard_tunnel_interface_ip: { 'metric': '100' } } }  } }] }}"    
+  with_items: 
+    - "{{ groups['wireguardservers'] | difference(inventory_hostname) }}"
+
+- name: print wg_server_endpoints
+  debug:
+     msg: "{{ wg_server_endpoints }}"
+
+- name: stop wg0
+  systemd:
+    name: "wg-quick@wg0"
+    state: stopped
+    enabled: yes
+    masked: no
+
+- name: generate Wireguard server config
+  template:
+    src: "wg0.j2"
+    dest: "{{ wg_conf_dir }}/wg0.conf"
+    mode: 0640
+    backup: no
+    force: yes
+  loop: "{{ wg_server_endpoints }}"
+
+- name: set wireguard private key in config file
+  ansible.builtin.lineinfile:
+    path: /etc/wireguard/wg0.conf
+    regexp: '^PrivateKey = '
+    line: PrivateKey = {{ wg_privatekey_base64.content | b64decode | replace('\n', '')}}
+  no_log: true  
+  notify: 
+    - enable wg0
+
+- name: command restart wg0
+  command: systemctl restart wg-quick@wg0 
+  register: ret_restart_wg0
+  ignore_errors: yes
+
+- name: print ret_restart_wg0
+  debug:
+    var: ret_restart_wg0
+
+- name: cleanup wg0
+  command: ip l del dev wg0 
+  register: ret_cleanup_wg0
+  when: ret_restart_wg0.failed
+
+- name: print ret_cleanup_wg0
+  debug:
+    var: ret_cleanup_wg0
+  when: ret_restart_wg0.failed

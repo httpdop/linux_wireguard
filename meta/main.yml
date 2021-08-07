@@ -1,0 +1,24 @@
+galaxy_info:
+  author: Oliver Pranke
+  description: Ansible Galaxy role to create side-to-side or mulit-side wireguard setups.
+
+  license: MIT
+
+  min_ansible_version: 2.9.20
+
+  # If this a Container Enabled role, provide the minimum Ansible Container version.
+  # min_ansible_container_version:
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - hirsute
+        - focal
+        - bionic
+        - groovy
+
+  galaxy_tags:
+    - linux
+    - wireguard
+    - vpn
+    - network

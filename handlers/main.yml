@@ -1,0 +1,25 @@
+---
+
+- name: enable wg0
+  systemd:
+    name: "wg-quick@wg0"
+    enabled: yes
+    masked: no
+
+- name: start wg0
+  systemd:
+    name: "wg-quick@wg0"
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: stop wg0
+  systemd:
+    name: "wg-quick@wg0"
+    state: stopped
+
+- name: restart wg0
+  systemd:
+    name: "wg-quick@wg0"
+    state: restarted
+    daemon_reload: yes

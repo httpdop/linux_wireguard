@@ -1,0 +1,4 @@
+---
+# defaults file for linux_wireguard
+wg_conf_dir: '/etc/wireguard'
+wg_listen_port: "53729"

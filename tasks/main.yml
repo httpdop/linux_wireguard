@@ -1,0 +1,7 @@
+---
+
+- import_tasks: install.yml
+  tags: wg_install
+
+- import_tasks: configure.yml
+  tags: wg_configure

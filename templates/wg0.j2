@@ -1,0 +1,35 @@
+[Interface]
+Address = {{ wireguard_tunnel_interface_ip }}
+PrivateKey = PutInHereThePrivateKey
+ListenPort = {{ wg_listen_port }}
+
+PostUp = sysctl -w net.ipv4.conf.wg0.forwarding=1
+{% for item in wg_server_endpoints %}
+PostUp = iptables -A FORWARD -s {{ item.WgTunIfaceIp }} -i wg0 -j ACCEPT
+PostUp = iptables -A FORWARD -s {{ item.LocalNetwork }} -i wg0 -j ACCEPT
+PostUp = iptables -A FORWARD -d {{ item.WgTunIfaceIp }} -o wg0 -j ACCEPT
+PostUp = iptables -A FORWARD -d {{ item.LocalNetwork }} -o wg0 -j ACCEPT
+{% for key, value in item.Route.items() %}
+#PostUp = ip route add {{ key }} via {{ value.next_hop | first | ipaddr('address') }}
+{% endfor %}
+{% endfor %}
+
+{% for item in wg_server_endpoints %}
+PreDown = iptables -D FORWARD -s {{ item.WgTunIfaceIp }} -i wg0 -j ACCEPT
+PreDown = iptables -D FORWARD -s {{ item.LocalNetwork }} -i wg0 -j ACCEPT
+PreDown = iptables -D FORWARD -d {{ item.WgTunIfaceIp }} -o wg0 -j ACCEPT
+PreDown = iptables -D FORWARD -d {{ item.LocalNetwork }} -o wg0 -j ACCEPT
+{% for key, value in item.Route.items() %}
+#PreDown = ip route add {{ key }} via {{ value.next_hop | first | ipaddr('address') }}
+{% endfor %}
+{% endfor %}
+PreDown = sysctl -w net.ipv4.conf.wg0.forwarding=0
+PreDown = ip l del dev wg0
+
+{% for item in wg_server_endpoints %}
+[Peer]
+EndPoint = {{ item.EndPoint }}:{{ wg_listen_port }}
+PublicKey = {{ item.PublicKey.content | b64decode | replace('\n', '') }}
+AllowedIps = {{ item.AllowedIps|join(',') }}
+
+{% endfor %}
